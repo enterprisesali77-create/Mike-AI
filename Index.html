@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mike: AI Voice Assistant (Upgraded)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        /* Animation for the listening state */
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7);
+            }
+            50% {
+                transform: scale(1.05);
+                box-shadow: 0 0 0 20px rgba(59, 130, 246, 0);
+            }
+        }
+
+        .listening {
+            animation: pulse 2s infinite;
+        }
+        
+        /* Custom scrollbar for the chat area */
+        #chat-log::-webkit-scrollbar {
+            width: 8px;
+        }
+        #chat-log::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        #chat-log::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        #chat-log::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+
+    <!-- Main App Container -->
+    <div class="w-full max-w-2xl mx-auto bg-white rounded-2xl shadow-2xl flex flex-col h-[90vh] md:h-[80vh]">
+        
+        <!-- Header -->
+        <header class="p-4 border-b border-gray-200 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Mike</h1>
+                <p class="text-xs text-gray-500">Created by Ali Asghar Virk</p>
+            </div>
+            <div id="mike-status-icon" class="w-4 h-4 rounded-full bg-green-400 transition-colors duration-300" title="Status: Idle"></div>
+        </header>
+
+        <!-- Chat Log -->
+        <div id="chat-log" class="flex-1 p-6 overflow-y-auto space-y-6">
+            <!-- Initial message from Mike -->
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shrink-0">M</div>
+                <div class="bg-gray-200 text-gray-800 p-4 rounded-lg rounded-tl-none max-w-md">
+                    <p>Hello! I'm Mike, an AI assistant created by Ali Asghar. I'm connected to a powerful AI and can access real-time information. How can I help you?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status & Control Area -->
+        <footer class="p-4 border-t border-gray-200">
+            <div id="status-container" class="text-center mb-2 h-6">
+                <p id="status-text" class="text-gray-500 text-sm transition-opacity duration-300">Press the button or type to start</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Text Input Form -->
+                <form id="prompt-form" class="flex-grow flex items-center gap-3">
+                    <input type="text" id="prompt-input" placeholder="Write your prompt for Mike..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-400 focus:outline-none transition disabled:bg-gray-200">
+                    <button type="submit" id="send-button" class="bg-blue-500 text-white p-3 rounded-lg hover:bg-blue-600 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                        </svg>
+                    </button>
+                </form>
+                <!-- Mic Button -->
+                <button id="mic-button" class="w-14 h-14 bg-blue-500 text-white rounded-full flex items-center justify-center shrink-0 shadow-lg hover:bg-blue-600 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm5 4a1 1 0 11-2 0V4a1 1 0 112 0v4zM3 9a1 1 0 011-1h1a1 1 0 010 2H4a1 1 0 01-1-1zm12 0a1 1 0 011-1h1a1 1 0 110 2h-1a1 1 0 01-1-1zM9 14a5 5 0 01-5-5a1 1 0 112 0a3 3 0 006 0a1 1 0 112 0a5 5 0 01-5 5z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Custom Message Box for Errors/Notifications -->
+    <div id="message-box" class="fixed top-5 right-5 bg-red-500 text-white p-4 rounded-lg shadow-lg transform translate-x-[120%] transition-transform duration-500">
+        <p id="message-text"></p>
+    </div>
+
+
+    <script>
+        // --- DOM Element References ---
+        const micButton = document.getElementById('mic-button');
+        const statusText = document.getElementById('status-text');
+        const chatLog = document.getElementById('chat-log');
+        const mikeStatusIcon = document.getElementById('mike-status-icon');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const promptForm = document.getElementById('prompt-form');
+        const promptInput = document.getElementById('prompt-input');
+        const sendButton = document.getElementById('send-button');
+
+        // --- Speech Recognition and Synthesis Setup ---
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const recognition = SpeechRecognition ? new SpeechRecognition() : null;
+        const speechSynthesis = window.speechSynthesis;
+
+        let isListening = false;
+        let chatHistory = [];
+
+        // --- Gemini API Configuration ---
+        const apiKey = ""; // This will be handled by the environment.
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        // --- Core Functions ---
+
+        /**
+         * Initializes the application and checks for browser compatibility.
+         */
+        function initialize() {
+            if (!recognition) {
+                showNotification("Voice input is not supported in this browser. Please use text input.");
+                micButton.disabled = true;
+            }
+            if (!speechSynthesis) {
+                showNotification("Voice output is not supported in this browser.");
+            }
+
+            if (recognition) {
+                recognition.continuous = false;
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+                
+                micButton.addEventListener('click', toggleListening);
+                recognition.addEventListener('result', handleRecognitionResult);
+                recognition.addEventListener('error', handleRecognitionError);
+                recognition.addEventListener('end', () => {
+                    if (isListening) {
+                        toggleListening(); 
+                    }
+                });
+            }
+            
+            promptForm.addEventListener('submit', handleFormSubmit);
+        }
+        
+        /**
+         * Handles the submission of the text prompt form.
+         * @param {Event} event - The form submission event.
+         */
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const userInput = promptInput.value.trim();
+            if (userInput) {
+                promptInput.value = '';
+                processAndRespond(userInput);
+            }
+        }
+
+        /**
+         * Toggles the listening state on/off.
+         */
+        function toggleListening() {
+            isListening = !isListening;
+            if (isListening) {
+                try {
+                    recognition.start();
+                    updateUI('listening');
+                } catch (error) {
+                    console.error("Recognition start error:", error);
+                    isListening = false;
+                    updateUI('idle');
+                }
+            } else {
+                recognition.stop();
+                updateUI('idle');
+            }
+        }
+
+        /**
+         * Handles the result from the SpeechRecognition API.
+         * @param {SpeechRecognitionEvent} event - The event containing the speech result.
+         */
+        function handleRecognitionResult(event) {
+            const transcript = event.results[0][0].transcript.trim();
+            if (transcript) {
+                processAndRespond(transcript);
+            }
+            toggleListening(); // Turn off listening after getting a result
+        }
+
+        /**
+         * Central function to process user input (from voice or text) and get AI response.
+         * @param {string} userInput - The user's full query.
+         */
+        async function processAndRespond(userInput) {
+            addMessageToLog(userInput, 'user');
+            updateUI('thinking');
+            
+            const aiResponse = await getAIResponse(userInput);
+            addMessageToLog(aiResponse, 'ai');
+            speak(aiResponse);
+        }
+        
+        /**
+         * Handles errors from the SpeechRecognition API.
+         */
+        function handleRecognitionError(event) {
+            console.error('Speech recognition error:', event.error);
+            let errorMessage = "Something went wrong with voice recognition.";
+            if (event.error === 'no-speech') {
+                errorMessage = "I didn't hear anything. Please try again.";
+            } else if (event.error === 'audio-capture') {
+                errorMessage = "I can't access your microphone. Please check permissions.";
+            } else if (event.error === 'not-allowed') {
+                errorMessage = "Microphone access was denied. Please enable it in your browser settings.";
+            }
+            showNotification(errorMessage);
+            updateUI('idle');
+        }
+
+        /**
+         * Generates a response from the Gemini AI with exponential backoff for retries.
+         * @param {string} userInput - The user's transcribed text.
+         * @returns {Promise<string>} The AI's response.
+         */
+        async function getAIResponse(userInput) {
+            chatHistory.push({ role: "user", parts: [{ text: userInput }] });
+
+            const payload = { 
+                contents: chatHistory,
+                systemInstruction: {
+                    parts: [
+                        { text: "You are Mike, a helpful and friendly AI assistant created by Ali Asghar. Your responses should be conversational, clear, and grammatically perfect. When you speak, it should sound natural and be easy to understand." }
+                    ]
+                }
+            };
+
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        if (response.status >= 400 && response.status < 500) {
+                           throw new Error(`API Client Error: ${response.status}`);
+                        }
+                        throw new Error(`API Server Error: ${response.status}`);
+                    }
+
+                    const result = await response.json();
+                    
+                    if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
+                        const aiText = result.candidates[0].content.parts[0].text;
+                        chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+                        return aiText;
+                    } else {
+                        throw new Error("Invalid API response structure.");
+                    }
+
+                } catch (error) {
+                    attempts++;
+                    console.error(`Attempt ${attempts} failed:`, error);
+                    if (attempts >= maxAttempts) {
+                        chatHistory.pop(); // Remove the failed user message from history
+                        return "I'm having trouble connecting to my knowledge base right now. Please check your connection and try again later.";
+                    }
+                    const delay = Math.pow(2, attempts - 1) * 1000;
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+
+        /**
+         * Uses the SpeechSynthesis API to speak the given text.
+         */
+        function speak(text) {
+            if (!speechSynthesis) {
+                updateUI('idle');
+                return;
+            }
+            
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.onstart = () => updateUI('speaking');
+            utterance.onend = () => updateUI('idle');
+            utterance.onerror = (event) => {
+                console.error('Speech synthesis error:', event);
+                showNotification("Sorry, I couldn't speak the response.");
+                updateUI('idle');
+            };
+
+            speechSynthesis.speak(utterance);
+        }
+
+        // --- UI Helper Functions ---
+
+        /**
+         * Updates the UI elements based on the app's current state.
+         */
+        function updateUI(state) {
+            const isBusy = (state === 'thinking' || state === 'speaking');
+            
+            promptInput.disabled = isBusy;
+            sendButton.disabled = isBusy;
+            micButton.disabled = isBusy;
+
+            switch (state) {
+                case 'listening':
+                    statusText.textContent = 'Listening...';
+                    micButton.classList.add('listening', 'bg-red-500');
+                    micButton.classList.remove('bg-blue-500');
+                    mikeStatusIcon.className = 'w-4 h-4 rounded-full bg-red-400 transition-colors duration-300';
+                    mikeStatusIcon.title = 'Status: Listening';
+                    break;
+                case 'thinking':
+                    statusText.textContent = 'Thinking...';
+                    micButton.classList.remove('listening');
+                    mikeStatusIcon.className = 'w-4 h-4 rounded-full bg-yellow-400 transition-colors duration-300';
+                    mikeStatusIcon.title = 'Status: Thinking';
+                    break;
+                case 'speaking':
+                    statusText.textContent = 'Speaking...';
+                    mikeStatusIcon.className = 'w-4 h-4 rounded-full bg-purple-400 transition-colors duration-300';
+                    mikeStatusIcon.title = 'Status: Speaking';
+                    break;
+                case 'idle':
+                default:
+                    statusText.textContent = 'Press the button or type to start';
+                    micButton.classList.remove('listening', 'bg-red-500');
+                    micButton.classList.add('bg-blue-500');
+                    micButton.disabled = !recognition;
+                    promptInput.disabled = false;
+                    sendButton.disabled = false;
+                    mikeStatusIcon.className = 'w-4 h-4 rounded-full bg-green-400 transition-colors duration-300';
+                    mikeStatusIcon.title = 'Status: Idle';
+                    break;
+            }
+        }
+
+        /**
+         * Adds a message bubble to the chat log.
+         */
+        function addMessageToLog(text, sender) {
+            const messageWrapper = document.createElement('div');
+            const messageBubble = document.createElement('div');
+            
+            if (sender === 'user') {
+                messageWrapper.className = 'flex items-start gap-3 justify-end';
+                messageBubble.className = 'bg-blue-500 text-white p-4 rounded-lg rounded-br-none max-w-md';
+                messageBubble.innerHTML = `<p>${text}</p>`;
+                
+                const userIcon = document.createElement('div');
+                userIcon.className = 'w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 font-bold text-lg shrink-0';
+                userIcon.textContent = 'U';
+                
+                messageWrapper.appendChild(messageBubble);
+                messageWrapper.appendChild(userIcon);
+            } else { // AI
+                messageWrapper.className = 'flex items-start gap-3';
+                messageBubble.className = 'bg-gray-200 text-gray-800 p-4 rounded-lg rounded-tl-none max-w-md';
+                messageBubble.innerHTML = `<p>${text}</p>`;
+                
+                const aiIcon = document.createElement('div');
+                aiIcon.className = 'w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold text-lg shrink-0';
+                aiIcon.textContent = 'M';
+
+                messageWrapper.appendChild(aiIcon);
+                messageWrapper.appendChild(messageBubble);
+            }
+
+            chatLog.appendChild(messageWrapper);
+            chatLog.scrollTop = chatLog.scrollHeight;
+        }
+        
+        /**
+         * Shows a temporary notification message on the screen.
+         */
+        function showNotification(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('translate-x-[120%]');
+            setTimeout(() => {
+                messageBox.classList.add('translate-x-[120%]');
+            }, 4000);
+        }
+
+        // --- Start the App ---
+        initialize();
+
+    </script>
+</body>
+</html>
